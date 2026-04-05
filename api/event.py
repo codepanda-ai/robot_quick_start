@@ -105,10 +105,10 @@ class EventManager(object):
     @staticmethod
     def _decrypt_data(encrypt_key, data):
         encrypt_data = data.get("encrypt")
-        if encrypt_key == "" and encrypt_data is None:
+        if not encrypt_key and encrypt_data is None:
             # data haven't been encrypted
             return data
-        if encrypt_key == "":
+        if not encrypt_key:
             raise Exception("ENCRYPT_KEY is necessary")
         cipher = AESCipher(encrypt_key)
 
