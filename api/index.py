@@ -14,6 +14,8 @@ from dotenv import load_dotenv, find_dotenv
 # load env parameters form file named .env
 load_dotenv(find_dotenv())
 
+logging.getLogger().setLevel(logging.INFO)
+
 app = Flask(__name__)
 
 # load from env
