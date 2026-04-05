@@ -1,2 +1,6 @@
 python/__pycache__/
 python/.env
+api/__pycache__/
+.env
+.vercel/
+.vercel
