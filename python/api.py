@@ -48,7 +48,7 @@ class MessageApiClient(object):
         # get tenant_access_token and set, implemented based on Feishu open api capability. doc link: https://open.feishu.cn/document/ukTMukTMukTM/ukDNz4SO0MjL5QzM/auth-v3/auth/tenant_access_token_internal
         url = "{}{}".format(self._lark_host, TENANT_ACCESS_TOKEN_URI)
         req_body = {"app_id": self._app_id, "app_secret": self._app_secret}
-        response = requests.post(url, req_body)
+        response = requests.post(url, json=req_body)
         MessageApiClient._check_error_response(response)
         self._tenant_access_token = response.json().get("tenant_access_token")
 
@@ -56,6 +56,7 @@ class MessageApiClient(object):
     def _check_error_response(resp):
         # check if the response contains error information
         if resp.status_code != 200:
+            logging.error("HTTP error %s: %s", resp.status_code, resp.text)
             resp.raise_for_status()
         response_dict = resp.json()
         code = response_dict.get("code", -1)
