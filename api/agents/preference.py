@@ -11,9 +11,12 @@ from core.tool_registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
+# All 5 required preference fields — must all be collected before triggering suggestions
+ALL_PREFERENCE_FIELDS = ["activity", "budget", "vibe", "location", "availability"]
+
 
 class PreferenceAgent(BaseAgent):
-    """Captures user preferences (activity, budget, vibe, availability)."""
+    """Captures user preferences via 5 sequential questions: activity, budget, vibe, location, availability."""
 
     WRITABLE_FIELDS: set = {
         "intent_profile", "phase", "suggestions", "selected_suggestion",
@@ -72,7 +75,7 @@ class PreferenceAgent(BaseAgent):
             pass
 
         if updates.get("intent_profile"):
-            # Merge with existing profile — check if we have enough to move on
+            # Merge with existing profile
             merged = dict(session.intent_profile.model_dump())
             for k, v in updates["intent_profile"].items():
                 if v is not None:
@@ -80,12 +83,18 @@ class PreferenceAgent(BaseAgent):
 
             updates["intent_profile"] = {k: v for k, v in updates["intent_profile"].items() if v is not None}
 
-            # Profile is "complete" when at least activity is set
-            if merged.get("activity"):
-                updates["phase"] = Phase.GATHERING
-                logger.info("Preference profile has activity, moving to gathering: %s", merged)
+            # Move to GATHERING as soon as we have at least one field so that
+            # short follow-up replies (e.g. "cheap", "chill") keep routing here.
+            # _handle_gathering gates the suggestion chain on _profile_is_complete.
+            updates["phase"] = Phase.GATHERING
+
+            missing = [f for f in ALL_PREFERENCE_FIELDS if not merged.get(f)]
+            if missing:
+                logger.info("Collecting preferences — still missing: %s", missing)
+            else:
+                logger.info("All preference fields collected: %s", merged)
 
             return AgentResult(session_updates=updates, response=response.content)
 
-        # No preferences extracted — follow-up was sent via tool
-        return AgentResult(session_updates={"phase": Phase.GATHERING}, response=response.content)
+        # No preferences extracted — stay in current phase (follow-up question sent via tool)
+        return AgentResult(session_updates={}, response=response.content)

@@ -96,7 +96,6 @@ class CallbackManager:
 
         body_token = _app_verification_token(data)
         if body_token != verification_token:
-            logger.warning("Card callback rejected: invalid token")
             return {}
 
         open_id, action = _normalize_card_action(data)

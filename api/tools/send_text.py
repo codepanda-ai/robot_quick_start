@@ -34,6 +34,9 @@ class SendTextTool(ITool):
         text = kwargs.get("text", "")
         if not open_id:
             return {"error": "open_id is required"}
+        if open_id.startswith("ou_mock_"):
+            logger.info("[MOCK] Would send text to %s: %s", open_id, text[:80])
+            return {"status": "mock_sent", "open_id": open_id}
         content = json.dumps({"text": text})
         self._client.send_text_with_open_id(open_id, content)
         logger.info("Sent text to %s: %s", open_id, text[:80])

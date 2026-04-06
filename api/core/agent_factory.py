@@ -12,6 +12,7 @@ from agents.fallback import FallbackAgent
 from agents.preference import PreferenceAgent
 from agents.suggestion import SuggestionAgent
 from agents.invite import InviteAgent
+from agents.confirmation import ConfirmationAgent
 
 
 class AgentFactory:
@@ -46,6 +47,11 @@ class AgentFactory:
         tools.register(CreateGroupChatTool(self._msg_client))
         return InviteAgent(self._llm, tools)
 
+    def create_confirmation_agent(self) -> IAgent:
+        tools = ToolRegistry()
+        tools.register(SendTextTool(self._msg_client))
+        return ConfirmationAgent(self._llm, tools)
+
     def create_orchestrator(self):
         from core.orchestrator import OrchestratorAgent
         session_service = SessionService(self._session_store)
@@ -54,6 +60,7 @@ class AgentFactory:
             preference_agent=self.create_preference_agent(),
             suggestion_agent=self.create_suggestion_agent(),
             invite_agent=self.create_invite_agent(),
+            confirmation_agent=self.create_confirmation_agent(),
             session_service=session_service,
             message_api_client=self._msg_client,
         )

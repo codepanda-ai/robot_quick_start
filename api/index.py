@@ -91,47 +91,61 @@ def message_receive_event_handler(req_data: MessageReceiveEvent):
     return jsonify()
 
 
-# Card action callback handlers
+# Card action callback handlers — return orchestrator result so Lark can update cards in-place.
+# The dict may contain 'card' (in-place card update) and/or 'toast' (notification).
+
+def _card_handler(open_id: str, action_value: dict) -> dict:
+    return orchestrator.handle(open_id, "", card_action=action_value) or {}
+
+
 @callback_manager.register("select_suggestion")
 def handle_select_suggestion(open_id: str, action_value: dict) -> dict:
-    orchestrator.handle(open_id, "", card_action=action_value)
-    return {}
+    return _card_handler(open_id, action_value)
 
 
 @callback_manager.register("select_buddy")
 def handle_select_buddy(open_id: str, action_value: dict) -> dict:
-    orchestrator.handle(open_id, "", card_action=action_value)
-    return {}
+    return _card_handler(open_id, action_value)
 
 
 @callback_manager.register("buddies_confirmed")
 def handle_buddies_confirmed(open_id: str, action_value: dict) -> dict:
-    orchestrator.handle(open_id, "", card_action=action_value)
-    return {}
+    return _card_handler(open_id, action_value)
+
+
+@callback_manager.register("go_solo")
+def handle_go_solo(open_id: str, action_value: dict) -> dict:
+    return _card_handler(open_id, action_value)
+
+
+@callback_manager.register("accept_invite")
+def handle_accept_invite(open_id: str, action_value: dict) -> dict:
+    return _card_handler(open_id, action_value)
+
+
+@callback_manager.register("reject_invite")
+def handle_reject_invite(open_id: str, action_value: dict) -> dict:
+    return _card_handler(open_id, action_value)
 
 
 @callback_manager.register("confirm")
 def handle_confirm(open_id: str, action_value: dict) -> dict:
-    orchestrator.handle(open_id, "", card_action=action_value)
-    return {}
+    return _card_handler(open_id, action_value)
 
 
 @callback_manager.register("cancel")
 def handle_cancel(open_id: str, action_value: dict) -> dict:
-    orchestrator.handle(open_id, "", card_action=action_value)
-    return {}
+    return _card_handler(open_id, action_value)
 
 
 @callback_manager.register("reset")
 def handle_reset(open_id: str, action_value: dict) -> dict:
-    orchestrator.handle(open_id, "", card_action=action_value)
-    return {}
+    return _card_handler(open_id, action_value)
 
 
 @callback_manager.register("quick_preference")
 def handle_quick_preference(open_id: str, action_value: dict) -> dict:
-    orchestrator.handle(open_id, "", card_action=action_value)
-    return {}
+    return _card_handler(open_id, action_value)
 
 
 @app.errorhandler(Exception)
