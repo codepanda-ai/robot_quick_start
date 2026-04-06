@@ -1,7 +1,7 @@
 import logging
 
 from interfaces.agent import IAgent, AgentResult
-from interfaces.models import SessionState
+from interfaces.models import IntentProfile, SessionState
 from interfaces.session_store import ISessionStore
 
 
@@ -30,12 +30,16 @@ class SessionService:
         if not updates:
             return current
 
-        # Deep merge nested Pydantic models (IntentProfile)
-        if "intent_profile" in updates and isinstance(updates["intent_profile"], dict):
-            merged_profile = current.intent_profile.model_copy(
-                update={k: v for k, v in updates["intent_profile"].items() if v is not None}
-            )
-            updates["intent_profile"] = merged_profile
+        # IntentProfile: full model replaces session; dicts are merged (None = leave unchanged)
+        if "intent_profile" in updates:
+            ip = updates["intent_profile"]
+            if isinstance(ip, IntentProfile):
+                pass  # replace wholesale, e.g. reset with IntentProfile()
+            elif isinstance(ip, dict):
+                merged_profile = current.intent_profile.model_copy(
+                    update={k: v for k, v in ip.items() if v is not None}
+                )
+                updates["intent_profile"] = merged_profile
 
         # Apply updates via model_copy (Pydantic validates the result)
         updated = current.model_copy(update=updates)

@@ -5,7 +5,7 @@ from typing import Optional
 from agents.base import BaseAgent
 from interfaces.agent import AgentResult
 from interfaces.llm_client import ILLMClient, LLMResponse
-from interfaces.models import SessionState, Phase
+from interfaces.models import SessionState, Phase, IntentProfile
 from core.tool_registry import ToolRegistry
 
 
@@ -55,7 +55,8 @@ class PreferenceAgent(BaseAgent):
             return AgentResult(
                 session_updates={
                     "phase": Phase.IDLE,
-                    "intent_profile": {"activity": None, "budget": None, "vibe": None, "availability": None, "location": None},
+                    # Replace whole profile — dict-of-None is stripped by SessionService merge
+                    "intent_profile": IntentProfile(),
                     "suggestions": [],
                     "selected_suggestion": None,
                     "buddy_candidates": [],
