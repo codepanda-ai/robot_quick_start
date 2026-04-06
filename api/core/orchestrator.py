@@ -50,6 +50,10 @@ class OrchestratorAgent:
         self._session_service = session_service
         self._msg_client = message_api_client
 
+    def _full_reset(self, user_id: str) -> None:
+        """Clear persisted session for this user (store entry removed; next get is default SessionState)."""
+        self._session_service.reset_session(user_id)
+
     def handle(self, user_id: str, message: str, message_type: str = "text", card_action: Optional[dict] = None) -> dict:
         """Main entry point.
 
@@ -67,10 +71,12 @@ class OrchestratorAgent:
                 self._send_text(user_id, "I can only process text messages for now. Tell me what you'd like to do this weekend!")
                 return {}
 
-            # Reset keywords work from any phase (ack first, then preference agent / mock tools)
+            # Reset keywords work from any phase (ack → wipe session → preference on fresh state)
             if message.lower().strip() in RESET_KEYWORDS:
                 self._send_text(user_id, "Let's start fresh!")
-                self._route_to_agent(user_id, self._preference, message, session, context={"reset": True})
+                self._full_reset(user_id)
+                fresh = self._session_service.get_session(user_id)
+                self._route_to_agent(user_id, self._preference, message, fresh)
                 return {}
 
             # Route by phase
@@ -100,7 +106,7 @@ class OrchestratorAgent:
         except Exception as e:
             logger.error("Orchestrator error for user %s: %s", user_id, e, exc_info=True)
             self._send_text(user_id, "Something went wrong. Let's try again — what would you like to do this weekend?")
-            self._session_service.reset_session(user_id)
+            self._full_reset(user_id)
 
         return {}
 
@@ -183,9 +189,11 @@ class OrchestratorAgent:
         logger.warning("Unknown card action '%s' for user %s", action, user_id)
         return {}
 
-    def _on_reset(self, user_id: str, session: SessionState) -> dict:
+    def _on_reset(self, user_id: str, _session: SessionState) -> dict:
         self._send_text(user_id, "Let's start fresh!")
-        self._route_to_agent(user_id, self._preference, "", session, context={"reset": True})
+        self._full_reset(user_id)
+        fresh = self._session_service.get_session(user_id)
+        self._route_to_agent(user_id, self._preference, "", fresh)
         return {"toast": {"type": "info", "content": "Starting fresh! 🔄"}}
 
     def _on_select_suggestion(self, user_id: str, session: SessionState, card_action: dict) -> dict:
