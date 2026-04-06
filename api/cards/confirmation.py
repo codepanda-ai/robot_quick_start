@@ -151,6 +151,18 @@ def build_confirmed_card(activity: Activity, buddies: list[Buddy]) -> dict:
                 ),
             },
         },
+        {"tag": "hr"},
+        {
+            "tag": "action",
+            "actions": [
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "Start Over 🔄"},
+                    "type": "default",
+                    "value": {"action": "reset"},
+                },
+            ],
+        },
     ]
 
     return {

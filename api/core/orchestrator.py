@@ -193,7 +193,8 @@ class OrchestratorAgent:
         self._send_text(user_id, "Let's start fresh!")
         self._full_reset(user_id)
         fresh = self._session_service.get_session(user_id)
-        self._route_to_agent(user_id, self._preference, "", fresh)
+        # Non-empty message required: MockLLMClient skips preference flow when user content is ""
+        self._route_to_agent(user_id, self._preference, "start over", fresh)
         return {"toast": {"type": "info", "content": "Starting fresh! 🔄"}}
 
     def _on_select_suggestion(self, user_id: str, session: SessionState, card_action: dict) -> dict:
@@ -259,9 +260,8 @@ class OrchestratorAgent:
         return {"toast": {"type": "success", "content": "🎉 Invites sent! Enjoy your weekend!"}}
 
     def _on_reject_invite(self, user_id: str, session: SessionState) -> dict:
-        self._route_to_agent(user_id, self._confirmation, "", session, context={"action": "reject_invite"})
-        self._send_text(user_id, "No worries! Let's start fresh. What would you like to do this weekend?")
-        return {"toast": {"type": "info", "content": "Starting over! 🔄"}}
+        """Same full reset as keyword 'start over' / card `reset` (invite preview 'Start Over' button)."""
+        return self._on_reset(user_id, session)
 
     def _on_cancel(self, user_id: str, session: SessionState) -> dict:
         self._route_to_agent(user_id, self._invite, "", session, context={"action": "cancel"})
