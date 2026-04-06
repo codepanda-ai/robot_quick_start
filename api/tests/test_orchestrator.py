@@ -150,6 +150,13 @@ class TestOrchestratorStateMachine:
         orch.handle("user_1", "reset")
         assert store.get("user_1").phase == Phase.IDLE
 
+    def test_plan_my_weekend_resets(self):
+        """SPEC: 'plan my weekend' resets like other reset keywords."""
+        orch, store, client = _make_orchestrator()
+        orch.handle("user_1", "I want to go hiking")
+        orch.handle("user_1", "plan my weekend")
+        assert store.get("user_1").phase == Phase.IDLE
+
     def test_card_reset_action(self):
         """SPEC: card:reset → resets to idle."""
         orch, store, client = _make_orchestrator()

@@ -62,7 +62,7 @@ class PreferenceAgent(BaseAgent):
                     "selected_buddies": [],
                     "confirmation_status": None,
                 },
-                response="Let's start fresh! What would you like to do this weekend?",
+                response="Let's start fresh!",
             )
 
         # Try to parse extracted preferences from LLM response

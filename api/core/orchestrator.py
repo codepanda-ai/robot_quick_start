@@ -14,7 +14,14 @@ from data.mock_data import MOCK_ACTIVITIES, MOCK_BUDDIES, MOCK_WEATHER
 
 logger = logging.getLogger(__name__)
 
-RESET_KEYWORDS = {"start over", "reset", "cancel", "restart", "new plan"}
+RESET_KEYWORDS = {
+    "start over",
+    "reset",
+    "cancel",
+    "restart",
+    "new plan",
+    "plan my weekend",
+}
 
 
 class OrchestratorAgent:
@@ -60,10 +67,10 @@ class OrchestratorAgent:
                 self._send_text(user_id, "I can only process text messages for now. Tell me what you'd like to do this weekend!")
                 return {}
 
-            # Reset keywords work from any phase
+            # Reset keywords work from any phase (ack first, then preference agent / mock tools)
             if message.lower().strip() in RESET_KEYWORDS:
+                self._send_text(user_id, "Let's start fresh!")
                 self._route_to_agent(user_id, self._preference, message, session, context={"reset": True})
-                self._send_text(user_id, "Let's start fresh! What would you like to do this weekend?")
                 return {}
 
             # Route by phase
@@ -73,11 +80,20 @@ class OrchestratorAgent:
             elif phase == Phase.GATHERING:
                 self._handle_gathering(user_id, message, session)
             elif phase == Phase.SUGGESTING:
-                self._send_text(user_id, "Check out the suggestions above! Pick one you like, or say 'start over' to reset.")
+                self._send_text(
+                    user_id,
+                    "Check out the suggestions above! Pick one you like, or say 'start over' or 'plan my weekend' to reset.",
+                )
             elif phase == Phase.INVITING:
-                self._send_text(user_id, "Select your buddies from the card above, or say 'start over' to reset.")
+                self._send_text(
+                    user_id,
+                    "Select your buddies from the card above, or say 'start over' or 'plan my weekend' to reset.",
+                )
             elif phase == Phase.CONFIRMED:
-                self._send_text(user_id, "Your plan is confirmed! 🎉 Say 'start over' to plan something new.")
+                self._send_text(
+                    user_id,
+                    "Your plan is confirmed! 🎉 Say 'start over' or 'plan my weekend' to plan something new.",
+                )
             else:
                 self._route_to_agent(user_id, self._fallback, message, session)
 
@@ -168,8 +184,8 @@ class OrchestratorAgent:
         return {}
 
     def _on_reset(self, user_id: str, session: SessionState) -> dict:
+        self._send_text(user_id, "Let's start fresh!")
         self._route_to_agent(user_id, self._preference, "", session, context={"reset": True})
-        self._send_text(user_id, "Let's start fresh! What would you like to do this weekend?")
         return {"toast": {"type": "info", "content": "Starting fresh! 🔄"}}
 
     def _on_select_suggestion(self, user_id: str, session: SessionState, card_action: dict) -> dict:
