@@ -3,3 +3,4 @@ python-dotenv
 requests
 pycryptodome
 Werkzeug<3
+pydantic>=2.0
