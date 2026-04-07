@@ -1,140 +1,89 @@
-# Quickly develop a bot
+# Weekend Buddy Agent
 
-> ⚠️ In order to facilitate the implementation of this tutorial, a reverse proxy tool (ngrok) is used. This tool is only suitable for the development and testing phase and cannot be used in the production environment. Before using it, you need to confirm whether it complies with the company's network security policy.
+A Feishu (Lark) bot that helps users navigate the full social friction loop of planning a weekend activity — from choosing what to do, to finding the right people, to sending the invites.
 
-This example shows how to use the Open Platform's bot function to have a bot receive user messages and make replies. You
-can extend the event processing functions of bot based on this example.
+---
 
-## Runtime environment
+## Demo
 
-- [Python 3](https://www.python.org/)
-- [ngrok](https://ngrok.com/download) (intranet penetration tool)
+[▶ Watch the demo](https://drive.google.com/file/d/1LYouf2afoTI-5HCdRU3cV69LYJXewLN5/view?usp=sharing)
 
-## Prep work
+---
 
-1. In [Developer Console](https://open.feishu.cn/app/), click **Create custom app**, then click the app name to go to
-   the app details page.
-2. Go to **Credentials & Basic Info** to obtain the `App ID` and `App Secret`, and then go to **Event Subscriptions** to
-   obtain the
-   `Encrypt Key` and `Verification Token`.
-3. Pull the latest code to local and enter the corresponding directory.
-    ```
-    git clone https://github.com/larksuite/lark-samples.git
-    cd lark-samples/robot_quick_start/python
-    ```
+## The Problem Being Solved and MVP Scope
 
+Planning a weekend often stalls not because people lack ideas, but because of the coordination overhead: picking an activity everyone enjoys, figuring out who to invite, and actually sending the message. **Weekend Buddy Agent** guides a user through the entire loop in a single conversation.
 
-4. Edit environment variables
+**Core user flow:**
+1. Gather user preferences (activity type, budget, vibe, location, availability)
+2. Suggest matching activities
+3. Find and select buddies
+4. Draft invite messages
+5. Confirm the plan and send invites
 
-   Edit the app credential data in the `.env` file to real data.
-    ```
-    APP_ID=cli_9fxxxx00b
-    APP_SECRET=EX6xxxxOF
-    APP_VERIFICATION_TOKEN=cq3xxxxxxkUS 
-    ENCRYPT_KEY=
-    ```
-   The above parameters can be viewed in [Developer Console](https://open.feishu.cn/app/). Encrypt Key can be empty.
+In the MVP, the priorities were **intuitive UX**, **core agent architecture**, and a **functional end-to-end flow**. The V1 design deliberately assumes a **linear conversation flow** — the user moves forward through each step in sequence (preferences → suggestions → buddies → invites) without backtracking. This constraint simplifies both the routing logic and the session state model, at the cost of flexibility. Deliberately de-prioritised: non-linear flows, edge case handling (e.g. repeat card taps), and advanced Feishu integrations.
 
-## Running with Docker
+**Development process:** The project followed a spec-driven approach. Setup of the Feishu bot integration took ~30 minutes using the [Lark echo bot guide](https://open.larksuite.com/document/develop-an-echo-bot/introduction). An engineering requirements spec was then drafted in ~1 hour using Claude Code Plan Mode, after which Claude Code implemented the V1 bot. A further ~30 minutes was spent testing and manually tuning behaviour. Claude Code was also equipped with a Lark/Feishu API integration skill so it could correctly reason about message and card APIs. The full spec is available at `SPEC.md`.
 
-Ensure that [Docker](https://www.docker.com/) has been installed before running. You can choose to run your code either
-with Docker or locally.
+---
 
-**Mac/Linux**
+## Tech Stack
 
-```
-sh exec.sh
-```
+| Layer | Technology |
+|---|---|
+| **Frontend** | [Feishu custom bot app](https://open.larksuite.com/document/client-docs/bot-v3/bot-overview) — interactive cards and messaging via the Feishu SDK |
+| **Backend** | Python · Flask · [Pydantic v2](https://docs.pydantic.dev/) · [lark-oapi](https://github.com/larksuite/oapi-sdk-python) |
+| **Hosting** | [Vercel](https://robot-quick-start.vercel.app/) — serverless deployment |
+| **LLM** | `MockLLMClient` (keyword-based simulation, swappable for any real LLM via `ILLMClient`) |
+| **State** | In-memory session store and intent profile store (per-process) |
 
-**Windows**
+---
 
-```
-.\exec.ps1
-```
+## How AI / LLMs Were Utilised
 
-## Running Locally
+Weekend Buddy uses a **multi-agent architecture** with a central **Orchestrator** and five specialised sub-agents, each encapsulating a distinct responsibility:
 
-1. Create and activate a new virtual environment.
+| Agent | Responsibility |
+|---|---|
+| `PreferenceAgent` | Gathers user preferences into an `IntentProfile` via 5 sequential questions |
+| `SuggestionAgent` | Suggests relevant activities based on the user's profile, with personalised "why" explanations |
+| `BuddyAgent` | Handles potential buddy search and multi-select |
+| `InviteAgent` | Drafts the invite message and sends final confirmation |
+| `FallbackAgent` | Handles greetings and off-topic messages |
 
-   **Mac/Linux**
-   ```
-   python3 -m venv venv 
-   . venv/bin/activate
-   ```
+**Key architectural decisions:**
 
-   **Windows**
-   ```
-   python3 -m venv venv 
-   venv\Scripts\activate
-   ```
+- `index.py`, `EventManager`, and `CallbackManager` handle the Feishu webhook boilerplate and route all events to the Orchestrator. All user interaction and session mutation is centralised there, leaving sub-agents focused purely on intelligence for their task.
 
-   Once activated, the terminal will display the virtual environment's name.
-   ```
-   (venv) **** python %
-   ```
+- **Orchestrator as a deterministic state machine.** The Orchestrator does not call the LLM — it is pure routing logic. The session moves forward through a fixed sequence of phases (`IDLE → GATHERING → SUGGESTING → INVITING → CONFIRMED`) and the Orchestrator uses the current phase to decide which agent handles each message. This design encodes the V1 assumption of linear conversation flows directly into the architecture: each phase has exactly one valid next step, which makes the system easy to debug and reason about. The trade-off is that mid-flow corrections ("oops, I picked the wrong activity") are not supported without an explicit "start over".
 
-2. Install dependencies
+- **BaseAgent pipeline.** Every sub-agent follows the same four-step template method: `_build_prompt → llm.chat → _execute_tools → _process_response`. This is the same pipeline pattern used by frameworks like LangChain and LlamaIndex — it makes sub-agents interchangeable, independently testable, and straightforward to extend.
 
-   ```
-   pip install -r requirements.txt
-   ```
+- **Structured LLM output.** `PreferenceAgent` instructs the LLM to return structured JSON (`{"extracted_preferences": {"activity": "hiking", "budget": "low"}}`), which it then parses and merges field-by-field into the `IntentProfile`. This mirrors the structured output / JSON mode offered by real LLM APIs (OpenAI, Gemini) and is the key pattern for reliable, parseable agent responses.
 
-3. Run
+- **WRITABLE_FIELDS as agent containment.** Each agent declares exactly which session fields it is allowed to mutate — `SuggestionAgent` can only write `suggestions` and `phase`; `BuddyAgent` can only write `buddy_candidates` and `selected_buddies`, and so on. `SessionService` enforces these boundaries at runtime and logs a warning if an agent attempts an unauthorised write. This prevents one agent from accidentally corrupting state owned by another.
 
-   ```
-   python3 server.py
-   ```
+- **Two-tier memory design.** `SessionState` is working memory — it tracks the active planning session and is cleared when the user says "start over". `IntentProfile` is long-term memory — it persists across resets in a separate `IntentProfileStore` and is never cleared. This separation means a user can abandon a session and still type *"same as last time"* in a future conversation to restore their preferences and skip straight to suggestions.
 
-## Complete the configuration and experience the bot
+- `SessionStore` manages conversational state — tracking where the user is in the planning flow across turns.
+- All LLM logic lives in `MockLLMClient`, which simulates a real LLM API (OpenAI, Gemini) using keyword matching to generate text responses and tool calls from natural language input. Because `MockLLMClient` is injected via the `ILLMClient` interface, swapping it for a real LLM in production is a one-line change in `AgentFactory`.
+- Like a real LLM API, `MockLLMClient` supports **tool calls** — `get_weather`, `search_buddies`, `send_feishu_message`, and `send_feishu_card` — executed by the agent after each LLM response.
+- `AgentFactory` centralises agent creation and tool registration, making the dependency graph explicit and testable.
 
-The messages received by the bot are all in the format of callback event request. Using the POST request method, they
-are sent to the server for processing. Once the local server is started, the callback event can't make requests to the
-intranet. The public network request URL must be configured.
+---
 
-Configuration involves the following two steps: Use the tool to penetrate the intranet, and go to the **Event
-Subscriptions** page to configure the public network request URL.
+## V2 Improvements
 
-1. Use the tool to expose the public network access portal for the local server. ngrok is used as an example here. If
-   the local has not been installed, you can access [ngrok](https://ngrok.com/download), and complete the installation
-   according to the guide.
+**Agent intelligence**
+- *LLM-powered Orchestrator:* Replace the deterministic phase-based router with an LLM-powered `OrchestratorAgent` that dynamically selects which agent to invoke based on user intent. This would unlock mid-flow corrections ("oops, I picked the wrong activity") and non-linear conversations that the current state machine cannot handle.
+- *Smarter preference gathering:* Accept free-form input ("something cheap and adventurous on Saturday") and extract multiple fields in one turn, skipping questions that are already answered.
+- *Conflict detection:* If the user requests contradictory preferences (e.g. "luxury hiking"), surface a clarification question instead of silently picking the closest match.
+- *Persistent conversation history:* Pass full message history to the LLM so agents can reference any previous session — not just the most recent `IntentProfile`.
 
-- Use the following commands to obtain the public network URL
+**Feishu integration**
+- Integrate with Feishu Contacts and Calendar to send calendar invites to confirmed attendees alongside the chat message.
+- Support group chat mode so the bot can coordinate preferences across multiple participants simultaneously, rather than planning on behalf of a single user.
 
-  **Note**: Before using a reverse proxy tool (ngrok), you need to determine whether it complies with the company's
-  network security policy.
-
-  **Note**: Need to get the token value in [ngrok](https://dashboard.ngrok.com/signup) in advance.
-   ```
-   ngrok authtoken <token> // <token> needs to be replaced
-   ngrok http 3000
-   ```
-
-
-2. Go to **Features** > **Bot** to enable **Using Bot**.
-3. Go to the **Event Subscriptions** page to configure the **Request URL**. Use the tool to generate the domain and fill
-   in the request URL, as shown in the figure below.
-   ![image.png](https://sf3-cn.feishucdn.com/obj/open-platform-opendoc/0ce38ea653e636accbd6d268b69360f9_Osy22NvNOK.png)
-   **Note**: Configuring the request URL and sending messages to the bot will both send requests to the backend server.
-   During the request period, the server should be kept in enabled status.
-
-4. Select the events listened to by the bot.
-
-   On the **Event Subscriptions** page, click **Add event** and select and subscribe to the `Message received` event.
-5. Add scopes to the bot
-
-   On the **Permissions & Scopes** page, search for the scopes you need, and add them to the bot.
-
-- Dependent scope list
-    - Read and send messages in private and group chats
-    - Read private messages sent to the bot
-
-  **Note**: The `Read private messages sent to the bot` scope is not displayed in **Added events**. You must switch to
-  the **Permissions & Scopes** page to add it to your bot.
-
-6. On the **Version Management & Release** page, click **Create a version** > **Submit for release**.
-
-   **Note**: The release involves scopes that need to be manually approved. You can use Test companies and users
-   function to generate a test version and complete the test. Note: After release, you can check whether users are
-   within the bot's availability range based on whether they can find the bot.
-
-8. Open **Feishu** and search for the **Bot name** to begin experiencing the bot's auto replies.
+**Infrastructure**
+- Migrate from Flask to FastAPI for better performance and async handling of concurrent requests.
+- Replace the in-memory session and preference stores with persistent Redis or a database so data survives server restarts and Vercel cold starts.
