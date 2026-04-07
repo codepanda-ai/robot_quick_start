@@ -23,6 +23,16 @@ RESET_KEYWORDS = {
     "plan my weekend",
 }
 
+SAME_AS_LAST_TIME_KEYWORDS = {
+    "same as last time",
+    "same",
+    "same as before",
+    "repeat",
+    "again",
+    "same preferences",
+    "use last",
+}
+
 
 class OrchestratorAgent:
     """Routes messages and card actions to the appropriate agent based on session phase.
@@ -41,6 +51,7 @@ class OrchestratorAgent:
         confirmation_agent: IAgent,
         session_service: SessionService,
         message_api_client,
+        intent_profile_service=None,
     ):
         self._fallback = fallback_agent
         self._preference = preference_agent
@@ -49,6 +60,7 @@ class OrchestratorAgent:
         self._confirmation = confirmation_agent
         self._session_service = session_service
         self._msg_client = message_api_client
+        self._intent_profile_service = intent_profile_service
 
     def _full_reset(self, user_id: str) -> None:
         """Clear persisted session for this user (store entry removed; next get is default SessionState)."""
@@ -78,6 +90,10 @@ class OrchestratorAgent:
                 fresh = self._session_service.get_session(user_id)
                 self._route_to_agent(user_id, self._preference, message, fresh)
                 return {}
+
+            # "Same as last time" — restore saved intent profile
+            if message.lower().strip() in SAME_AS_LAST_TIME_KEYWORDS:
+                return self._handle_same_as_last_time(user_id, session)
 
             # Route by phase
             phase = session.phase
@@ -111,6 +127,41 @@ class OrchestratorAgent:
         return {}
 
     # ─── Text message routing ─────────────────────────────────────────
+
+    def _handle_same_as_last_time(self, user_id: str, session: SessionState) -> dict:
+        """Restore the user's saved IntentProfile and route accordingly."""
+        if not self._intent_profile_service or not self._intent_profile_service.has_profile(user_id):
+            self._send_text(
+                user_id,
+                "I don't have any past preferences saved yet! Let's start fresh — what activity sounds good? 🎯"
+            )
+            return {}
+
+        saved = self._intent_profile_service.get(user_id)
+        logger.info("Restoring saved intent profile for %s: %s", user_id, saved.model_dump())
+
+        # Load the saved profile into a fresh session
+        self._session_service.apply_agent_result(
+            user_id, self._preference,
+            AgentResult(session_updates={"intent_profile": saved.model_dump(), "phase": Phase.GATHERING})
+        )
+        updated = self._session_service.get_session(user_id)
+
+        if self._profile_is_complete(updated.intent_profile):
+            summary = f"{saved.activity}, {saved.budget}, {saved.vibe}, {saved.location}, {saved.availability}"
+            self._send_text(user_id, f"Using your last preferences ({summary}) — finding suggestions... 🔍")
+            self._auto_chain_to_suggestions(user_id, "", updated)
+        else:
+            # Partial saved profile — PreferenceAgent asks only the missing questions
+            missing = [f for f in ["activity", "budget", "vibe", "location", "availability"]
+                       if not getattr(updated.intent_profile, f)]
+            self._send_text(
+                user_id,
+                f"Found your last preferences! Just need a couple more details — {', '.join(missing)}."
+            )
+            self._route_to_agent(user_id, self._preference, "", updated)
+
+        return {}
 
     @staticmethod
     def _profile_is_complete(profile) -> bool:

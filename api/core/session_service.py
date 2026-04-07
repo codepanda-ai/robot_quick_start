@@ -9,10 +9,15 @@ logger = logging.getLogger(__name__)
 
 
 class SessionService:
-    """Wraps ISessionStore with WRITABLE_FIELDS enforcement and Pydantic model merge."""
+    """Wraps ISessionStore with WRITABLE_FIELDS enforcement and Pydantic model merge.
 
-    def __init__(self, session_store: ISessionStore):
+    Optionally accepts an IntentProfileService to auto-persist intent_profile updates
+    to long-term memory after every agent result that touches the intent_profile.
+    """
+
+    def __init__(self, session_store: ISessionStore, intent_profile_service=None):
         self._store = session_store
+        self._intent_profile_service = intent_profile_service
 
     def get_session(self, user_id: str) -> SessionState:
         return self._store.get(user_id)
@@ -44,6 +49,11 @@ class SessionService:
         # Apply updates via model_copy (Pydantic validates the result)
         updated = current.model_copy(update=updates)
         self._store.save(user_id, updated)
+
+        # Auto-persist intent_profile to long-term memory on every write
+        if "intent_profile" in updates and self._intent_profile_service:
+            self._intent_profile_service.save(user_id, updated.intent_profile)
+
         return updated
 
     def reset_session(self, user_id: str) -> None:

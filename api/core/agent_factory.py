@@ -3,6 +3,8 @@ from interfaces.session_store import ISessionStore
 from interfaces.agent import IAgent
 from core.tool_registry import ToolRegistry
 from core.session_service import SessionService
+from core.intent_profile_store import InMemoryIntentProfileStore
+from core.intent_profile_service import IntentProfileService
 from tools.send_text import SendTextTool
 from tools.send_card import SendCardTool
 from tools.get_weather import GetWeatherTool
@@ -22,6 +24,7 @@ class AgentFactory:
         self._llm = llm_client
         self._session_store = session_store
         self._msg_client = message_api_client
+        self._intent_profile_service = IntentProfileService(InMemoryIntentProfileStore())
 
     def create_fallback_agent(self) -> IAgent:
         tools = ToolRegistry()
@@ -54,7 +57,7 @@ class AgentFactory:
 
     def create_orchestrator(self):
         from core.orchestrator import OrchestratorAgent
-        session_service = SessionService(self._session_store)
+        session_service = SessionService(self._session_store, self._intent_profile_service)
         return OrchestratorAgent(
             fallback_agent=self.create_fallback_agent(),
             preference_agent=self.create_preference_agent(),
@@ -63,4 +66,5 @@ class AgentFactory:
             confirmation_agent=self.create_confirmation_agent(),
             session_service=session_service,
             message_api_client=self._msg_client,
+            intent_profile_service=self._intent_profile_service,
         )
