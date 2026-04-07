@@ -23,7 +23,13 @@ Planning a weekend often stalls not because people lack ideas, but because of th
 
 In the MVP, the priorities were **intuitive UX**, **core agent architecture**, and a **functional end-to-end flow**. The V1 design deliberately assumes a **linear conversation flow** — the user moves forward through each step in sequence (preferences → suggestions → buddies → invites) without backtracking. This constraint simplifies both the routing logic and the session state model, at the cost of flexibility. Deliberately de-prioritised: non-linear flows, edge case handling (e.g. repeat card taps), and advanced Feishu integrations.
 
-**Development process:** The project followed a spec-driven approach. Setup of the Feishu bot integration took ~30 minutes using the [Lark echo bot guide](https://open.larksuite.com/document/develop-an-echo-bot/introduction). An engineering requirements spec was then drafted in ~1 hour using Claude Code Plan Mode, after which Claude Code implemented the V1 bot. A further ~30 minutes was spent testing and manually tuning behaviour. Claude Code was also equipped with a Lark/Feishu API integration skill so it could correctly reason about message and card APIs. The full spec is available at `SPEC.md`.
+**Development process:** The project followed a spec-driven approach. Setup of the Feishu bot integration took ~30 minutes using the [Lark echo bot guide](https://open.larksuite.com/document/develop-an-echo-bot/introduction). An engineering requirements spec was then drafted in ~1 hour using Claude Code Plan Mode, after which Claude Code implemented the V1 bot. A further ~30 minutes was spent testing and manually tuning behaviour. The full spec is available at `SPEC.md`.
+
+**Claude Code skills used:** Two custom [Claude Code skills](https://docs.anthropic.com/en/docs/claude-code/skills) (`.claude/skills/`) were created to augment Claude Code's workflow beyond standard code generation:
+
+- **`/lark` — Lark/Feishu API integration skill.** Provides Claude Code with complete knowledge of the Lark API surface — messaging, interactive cards, group management, contacts, and calendar. During development, this skill allowed Claude Code to correctly reason about Feishu-specific concepts like card action callbacks, message content schemas, and bot webhook event structures, without needing to repeatedly consult external documentation.
+
+- **`/test` — End-to-end browser test skill.** Automates the full user flow through the live Lark web client using Claude Code's Chrome browser control (MCP tools). When invoked, it opens the Lark messenger, navigates to the Weekend Buddy Agent chat, resets the session, answers all 5 preference questions, selects an activity, invites buddies, and confirms the plan — verifying each bot response along the way. This provides a one-command regression test against the deployed bot, useful for validating changes after each deploy without manual clicking.
 
 ---
 
