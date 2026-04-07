@@ -41,7 +41,11 @@ class InviteAgent(BaseAgent):
                 "role": "system",
                 "content": (
                     "You are the invite agent for a Weekend Buddy bot. "
-                    f"Action: {action}. "
+                    "Your task is to draft a warm, concise invite message for the confirmed activity and send it to each selected buddy. "
+                    "The message should mention the activity name, feel personal and upbeat, and include a call to action. "
+                    "On accept_invite: generate the invite message, send it to each buddy via direct message, then confirm the plan. "
+                    "On reject_invite: discard the current plan entirely and reset the session so the user can start fresh. "
+                    f"Current action: {action}. "
                     f"Selected activity: {session.selected_suggestion}. "
                     f"Selected buddies: {session.selected_buddies}."
                 ),

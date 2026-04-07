@@ -24,7 +24,16 @@ class FallbackAgent(BaseAgent):
 
     def _build_prompt(self, session: SessionState, message: str, context: Optional[dict]) -> list[dict]:
         return [
-            {"role": "system", "content": "You are a fallback handler for a Weekend Buddy bot. Respond to greetings and off-topic messages."},
+            {
+                "role": "system",
+                "content": (
+                    "You are a fallback agent for a Weekend Buddy bot. "
+                    "Your task is to handle messages that do not map to any active planning step — greetings, small talk, confused input, or out-of-scope requests. "
+                    "For greetings, respond warmly and prompt the user to start planning their weekend. "
+                    "For off-topic messages, politely redirect the conversation back to weekend activity planning. "
+                    "Keep responses short, friendly, and encouraging."
+                ),
+            },
             {"role": "user", "content": message},
         ]
 

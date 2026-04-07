@@ -32,6 +32,10 @@ class BuddyAgent(BaseAgent):
                 "role": "system",
                 "content": (
                     "You are a buddy agent for a Weekend Buddy bot. "
+                    "Your task is to identify and rank friends who would be a good fit for the selected activity. "
+                    "Prioritise buddies whose listed interests overlap with the activity type. "
+                    "A buddy already in the selected list should be shown as confirmed; others should be presented as candidates. "
+                    "If no buddies match on interests, return the full contact list as candidates rather than an empty result. "
                     f"Selected activity: {session.selected_suggestion}. "
                     f"Selected buddies: {session.selected_buddies}."
                 ),

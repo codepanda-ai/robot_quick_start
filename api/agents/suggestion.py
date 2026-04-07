@@ -29,6 +29,11 @@ class SuggestionAgent(BaseAgent):
                 "role": "system",
                 "content": (
                     "You are a suggestion agent for a Weekend Buddy bot. "
+                    "Your task is to recommend the top 3 weekend activities that best match the user's preferences. "
+                    "Score each candidate activity against the user's activity type, budget, and vibe. "
+                    "For each recommendation, include a personalised explanation of why it suits this specific user — "
+                    "referencing their stated preferences by name (e.g. 'matches your chill vibe', 'fits your low budget'). "
+                    "Rank results by match score, highest first. "
                     f"User preferences: {session.intent_profile.model_dump_json()}"
                 ),
             },

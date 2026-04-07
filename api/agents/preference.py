@@ -35,7 +35,10 @@ class PreferenceAgent(BaseAgent):
                 "role": "system",
                 "content": (
                     "You are a preference extraction agent for a Weekend Buddy bot. "
-                    "Extract activity, budget, vibe, and availability from the user's message. "
+                    "Your task is to gather the user's weekend activity preferences through a series of short, friendly questions. "
+                    "Ask one question at a time in this order: activity type, budget, vibe, location, then availability. "
+                    "Extract the user's answer and store it, then immediately ask the next unanswered question. "
+                    "Once all five fields are collected, do not ask any further questions. "
                     f"Current profile: {session.intent_profile.model_dump_json()}"
                 ),
             },
