@@ -6,7 +6,7 @@ from interfaces.agent import AgentResult
 from interfaces.llm_client import ILLMClient, LLMResponse
 from interfaces.models import SessionState, Phase, Activity
 from core.tool_registry import ToolRegistry
-from data.mock_data import MOCK_ACTIVITIES
+from services.activity_service import ActivityService
 
 
 logger = logging.getLogger(__name__)
@@ -17,8 +17,9 @@ class SuggestionAgent(BaseAgent):
 
     WRITABLE_FIELDS: set = {"suggestions", "phase"}
 
-    def __init__(self, llm_client: ILLMClient, tool_registry: ToolRegistry):
+    def __init__(self, llm_client: ILLMClient, tool_registry: ToolRegistry, activity_service: ActivityService):
         super().__init__(llm_client, tool_registry)
+        self._activity_service = activity_service
 
     def agent_name(self) -> str:
         return "suggestion"
@@ -62,7 +63,7 @@ class SuggestionAgent(BaseAgent):
     def _filter_activities(self, profile) -> list[Activity]:
         """Filter and rank activities based on user preferences, with personalised reasons."""
         scored = []
-        for activity in MOCK_ACTIVITIES:
+        for activity in self._activity_service.get_all():
             score = 0
             if profile.activity and profile.activity.lower() == activity.type.lower():
                 score += 3
@@ -77,7 +78,7 @@ class SuggestionAgent(BaseAgent):
 
         # If no matches at all, return top 3 anyway
         if not top:
-            top = MOCK_ACTIVITIES[:3]
+            top = self._activity_service.get_all()[:3]
 
         # Attach personalised "why" reason to each suggestion
         return [a.model_copy(update={"reason": self._personalize_reason(a, profile)}) for a in top]

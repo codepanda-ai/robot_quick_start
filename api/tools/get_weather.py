@@ -1,7 +1,7 @@
 import logging
 
 from interfaces.tool import ITool
-from data.mock_data import MOCK_WEATHER
+from services.weather_service import WeatherService
 
 
 logger = logging.getLogger(__name__)
@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 
 class GetWeatherTool(ITool):
     """Returns mock weather forecast for a given day."""
+
+    def __init__(self, weather_service: WeatherService):
+        self._weather_service = weather_service
 
     def name(self) -> str:
         return "get_weather"
@@ -31,7 +34,5 @@ class GetWeatherTool(ITool):
 
     def execute(self, **kwargs) -> dict:
         day = kwargs.get("day", "Saturday")
-        for forecast in MOCK_WEATHER:
-            if forecast.day.lower() == day.lower():
-                return forecast.model_dump()
-        return MOCK_WEATHER[0].model_dump()
+        forecast = self._weather_service.get_forecast(day)
+        return forecast.model_dump() if forecast else {}

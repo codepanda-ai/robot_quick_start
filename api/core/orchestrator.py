@@ -3,28 +3,22 @@ from typing import Optional, Callable
 
 from interfaces.agent import IAgent, AgentResult
 from interfaces.models import Phase, SessionState
-from core.session_service import SessionService
+from services.session_service import SessionService
+from services.activity_service import ActivityService
+from services.buddy_service import BuddyService
+from services.weather_service import WeatherService
+from constants import RESET_KEYWORDS, SAME_AS_LAST_TIME_KEYWORDS, ACTIVITY_KEYWORDS, GREETING_KEYWORDS
 from cards.suggestions import build_suggestions_card
 from cards.buddies import build_buddy_card
 from cards.confirmation import build_invite_preview_card, build_confirmed_card
-from data.mock_data import MOCK_WEATHER
 from utils import (
     send_text, send_card, build_toast,
     profile_is_complete, is_greeting,
-    resolve_activity, resolve_activity_name, resolve_buddies,
     generate_invite_preview,
 )
 
 
 logger = logging.getLogger(__name__)
-
-RESET_KEYWORDS = {
-    "start over", "reset", "cancel", "restart", "new plan", "plan my weekend",
-}
-
-SAME_AS_LAST_TIME_KEYWORDS = {
-    "same as last time", "same", "same as before", "repeat", "again", "same preferences", "use last",
-}
 
 
 class OrchestratorAgent:
@@ -54,6 +48,9 @@ class OrchestratorAgent:
         invite_agent: IAgent,
         session_service: SessionService,
         message_api_client,
+        activity_service: ActivityService,
+        buddy_service: BuddyService,
+        weather_service: WeatherService,
         intent_profile_service=None,
     ):
         self._fallback = fallback_agent
@@ -63,6 +60,9 @@ class OrchestratorAgent:
         self._invite = invite_agent
         self._session_service = session_service
         self._msg_client = message_api_client
+        self._activity_service = activity_service
+        self._buddy_service = buddy_service
+        self._weather_service = weather_service
         self._intent_profile_service = intent_profile_service
 
         # ── Phase dispatch table ──────────────────────────────────────
@@ -146,7 +146,6 @@ class OrchestratorAgent:
         return {}
 
     def _on_phase_idle(self, user_id: str, message: str, session: SessionState) -> None:
-        from llm.mock_client import ACTIVITY_KEYWORDS, GREETING_KEYWORDS
         text = message.lower().strip()
 
         if is_greeting(text, GREETING_KEYWORDS):
@@ -196,7 +195,7 @@ class OrchestratorAgent:
         """Run SuggestionAgent then send the suggestions card."""
         self._route(user_id, self._suggestion, message, session)
         updated = self._session_service.get_session(user_id)
-        weather = MOCK_WEATHER[0] if MOCK_WEATHER else None
+        weather = self._weather_service.get_forecast()
         if updated.suggestions:
             send_card(self._msg_client, user_id, build_suggestions_card(updated.suggestions, weather))
 
@@ -220,15 +219,16 @@ class OrchestratorAgent:
     def _on_select_buddy(self, user_id: str, session: SessionState, card_action: dict) -> dict:
         self._route(user_id, self._buddy, "", session, context=card_action)
         buddy_id = card_action.get("buddy_id", "")
-        buddy_name = next((b.name for b in resolve_buddies([buddy_id])), buddy_id)
+        buddy = self._buddy_service.get_by_ids([buddy_id])
+        buddy_name = buddy[0].name if buddy else buddy_id
         return build_toast("info", f"✅ {buddy_name} added to the invite list!")
 
     def _on_buddies_confirmed(self, user_id: str, session: SessionState, card_action: dict) -> dict:
         self._route(user_id, self._buddy, "", session, context=card_action)
         updated = self._session_service.get_session(user_id)
-        activity_name = resolve_activity_name(updated.selected_suggestion)
-        activity = resolve_activity(updated.selected_suggestion)
-        buddies = resolve_buddies(updated.selected_buddies)
+        activity = self._activity_service.get_by_id(updated.selected_suggestion)
+        activity_name = activity.name if activity else "the activity"
+        buddies = self._buddy_service.get_by_ids(updated.selected_buddies)
         preview = generate_invite_preview(self._invite, activity_name, buddies)
         if activity:
             send_card(self._msg_client, user_id, build_invite_preview_card(activity, buddies, preview))
@@ -244,8 +244,8 @@ class OrchestratorAgent:
     def _on_accept_invite(self, user_id: str, session: SessionState, _card_action: dict) -> dict:
         self._route(user_id, self._invite, "", session, context={"action": "accept_invite"})
         updated = self._session_service.get_session(user_id)
-        activity = resolve_activity(updated.selected_suggestion)
-        buddies = resolve_buddies(updated.selected_buddies)
+        activity = self._activity_service.get_by_id(updated.selected_suggestion)
+        buddies = self._buddy_service.get_by_ids(updated.selected_buddies)
         if activity:
             send_card(self._msg_client, user_id, build_confirmed_card(activity, buddies))
         return build_toast("success", "🎉 Invites sent! Enjoy your weekend!")
@@ -253,7 +253,7 @@ class OrchestratorAgent:
     def _on_cancel(self, user_id: str, session: SessionState, _card_action: dict) -> dict:
         self._route(user_id, self._buddy, "", session, context={"action": "cancel"})
         updated = self._session_service.get_session(user_id)
-        weather = MOCK_WEATHER[0] if MOCK_WEATHER else None
+        weather = self._weather_service.get_forecast()
         if updated.suggestions:
             send_card(self._msg_client, user_id, build_suggestions_card(updated.suggestions, weather))
         return build_toast("info", "Cancelled — pick another activity!")

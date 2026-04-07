@@ -4,52 +4,13 @@ import re
 from typing import Optional
 
 from interfaces.llm_client import ILLMClient, LLMResponse, ToolCall, FinishReason
+from constants import (
+    ACTIVITY_KEYWORDS, BUDGET_KEYWORDS, VIBE_KEYWORDS, LOCATION_KEYWORDS,
+    GREETING_KEYWORDS, PREFERENCE_FIELD_ORDER, FOLLOW_UP_QUESTIONS,
+)
 
 
 logger = logging.getLogger(__name__)
-
-# Keywords used for intent classification and preference extraction
-ACTIVITY_KEYWORDS = {
-    "hiking": "hiking", "hike": "hiking", "trail": "hiking", "walk": "hiking", "mountain": "hiking",
-    "beach": "beach", "swim": "beach", "ocean": "beach", "sea": "beach",
-    "dinner": "dining", "dining": "dining", "food": "dining", "eat": "dining", "restaurant": "dining",
-    "dim sum": "dining", "brunch": "dining", "lunch": "dining",
-    "movie": "indoor", "film": "indoor", "board game": "indoor", "cafe": "indoor", "indoor": "indoor",
-    "bar": "nightlife", "club": "nightlife", "nightlife": "nightlife", "pub": "nightlife", "drink": "nightlife",
-}
-
-BUDGET_KEYWORDS = {
-    "cheap": "low", "budget": "low", "free": "low", "low": "low", "affordable": "low",
-    "moderate": "medium", "medium": "medium", "mid": "medium",
-    "expensive": "high", "fancy": "high", "high": "high", "luxury": "high", "splurge": "high",
-}
-
-VIBE_KEYWORDS = {
-    "chill": "chill", "relax": "chill", "calm": "chill", "easy": "chill", "laid back": "chill", "quiet": "chill",
-    "adventure": "adventurous", "adventurous": "adventurous", "exciting": "adventurous", "challenge": "adventurous",
-    "social": "social", "friends": "social", "group": "social", "party": "social", "fun": "social", "people": "social",
-}
-
-LOCATION_KEYWORDS = {
-    "downtown": "downtown", "city": "downtown", "central": "downtown", "urban": "downtown",
-    "suburb": "suburbs", "suburbs": "suburbs", "outside": "suburbs", "outskirts": "suburbs",
-    "nature": "nature", "park": "nature", "forest": "nature", "outdoors": "nature", "outside city": "nature",
-    "east": "east side", "west": "west side", "north": "north side", "south": "south side",
-    "nearby": "nearby", "local": "nearby", "close": "nearby",
-}
-
-GREETING_KEYWORDS = {"hi", "hello", "hey", "yo", "sup", "howdy", "good morning", "good afternoon", "good evening"}
-
-# Sequential question order for preference gathering
-FIELD_ORDER = ["activity", "budget", "vibe", "location", "availability"]
-
-FOLLOW_UP_QUESTIONS = {
-    "activity": "What kind of activity sounds fun this weekend? 🎯 (e.g. hiking, dining, movies, beach, nightlife)",
-    "budget": "What's your budget like? 💰 (low / medium / high)",
-    "vibe": "What vibe are you going for? ✨ (chill, adventurous, or social)",
-    "location": "Any location preference? 📍 (e.g. downtown, nature, suburbs, nearby)",
-    "availability": "When are you free? 🗓️ (e.g. Saturday morning, Sunday afternoon, or all weekend)",
-}
 
 
 class MockLLMClient(ILLMClient):
@@ -117,7 +78,7 @@ class MockLLMClient(ILLMClient):
 
         # Determine which field we're currently asking for (next missing field in order)
         next_field = None
-        for field in FIELD_ORDER:
+        for field in PREFERENCE_FIELD_ORDER:
             if not current_profile.get(field):
                 next_field = field
                 break
@@ -174,7 +135,7 @@ class MockLLMClient(ILLMClient):
 
             # Find the next unanswered field after what we just extracted
             next_missing = None
-            for field in FIELD_ORDER:
+            for field in PREFERENCE_FIELD_ORDER:
                 if not merged.get(field):
                     next_missing = field
                     break

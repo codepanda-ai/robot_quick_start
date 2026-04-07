@@ -6,7 +6,8 @@ from interfaces.agent import AgentResult
 from interfaces.llm_client import ILLMClient, LLMResponse
 from interfaces.models import SessionState, Phase, ConfirmationStatus
 from core.tool_registry import ToolRegistry
-from data.mock_data import MOCK_BUDDIES, MOCK_ACTIVITIES
+from services.activity_service import ActivityService
+from services.buddy_service import BuddyService
 
 
 logger = logging.getLogger(__name__)
@@ -20,8 +21,11 @@ class BuddyAgent(BaseAgent):
         "confirmation_status", "phase",
     }
 
-    def __init__(self, llm_client: ILLMClient, tool_registry: ToolRegistry):
+    def __init__(self, llm_client: ILLMClient, tool_registry: ToolRegistry,
+                 activity_service: ActivityService, buddy_service: BuddyService):
         super().__init__(llm_client, tool_registry)
+        self._activity_service = activity_service
+        self._buddy_service = buddy_service
 
     def agent_name(self) -> str:
         return "buddy"
@@ -73,16 +77,11 @@ class BuddyAgent(BaseAgent):
         activity_name = context.get("activity", "")
 
         # Find matching activity type for buddy search
-        activity_type = ""
-        for activity in MOCK_ACTIVITIES:
-            if activity.id == suggestion_id:
-                activity_type = activity.type
-                break
+        activity = self._activity_service.get_by_id(suggestion_id)
+        activity_type = activity.type if activity else ""
 
         # Find matching buddies
-        buddies = [b for b in MOCK_BUDDIES if activity_type in b.interests] if activity_type else MOCK_BUDDIES
-        if not buddies:
-            buddies = MOCK_BUDDIES
+        buddies = self._buddy_service.get_by_activity_type(activity_type) if activity_type else self._buddy_service.get_all()
 
         return AgentResult(
             session_updates={

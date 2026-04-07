@@ -11,7 +11,7 @@ from lark_client import MessageApiClient
 from core.event_manager import EventManager
 from core.event import MessageReceiveEvent, UrlVerificationEvent
 from core.callback_manager import CallbackManager
-from core.session_store import InMemorySessionStore
+from data.session_store import InMemorySessionStore
 from core.agent_factory import AgentFactory
 from llm.mock_client import MockLLMClient
 from flask import Flask, jsonify, request

@@ -7,7 +7,8 @@ from interfaces.agent import AgentResult
 from interfaces.llm_client import ILLMClient, LLMResponse
 from interfaces.models import SessionState, Phase, ConfirmationStatus
 from core.tool_registry import ToolRegistry
-from data.mock_data import MOCK_ACTIVITIES, MOCK_BUDDIES
+from services.activity_service import ActivityService
+from services.buddy_service import BuddyService
 
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,11 @@ class InviteAgent(BaseAgent):
         "buddy_candidates", "selected_buddies",
     }
 
-    def __init__(self, llm_client: ILLMClient, tool_registry: ToolRegistry):
+    def __init__(self, llm_client: ILLMClient, tool_registry: ToolRegistry,
+                 activity_service: ActivityService, buddy_service: BuddyService):
         super().__init__(llm_client, tool_registry)
+        self._activity_service = activity_service
+        self._buddy_service = buddy_service
 
     def agent_name(self) -> str:
         return "invite"
@@ -74,15 +78,8 @@ class InviteAgent(BaseAgent):
 
     def _handle_accept(self, session: SessionState, response: LLMResponse) -> AgentResult:
         """Send invite DMs to each selected buddy and confirm the plan."""
-        # Resolve buddies
-        selected_buddy_objs = [b for b in MOCK_BUDDIES if b.id in session.selected_buddies]
-
-        # Resolve activity name
-        activity_name = session.selected_suggestion or "the activity"
-        for a in MOCK_ACTIVITIES:
-            if a.id == session.selected_suggestion:
-                activity_name = a.name
-                break
+        selected_buddy_objs = self._buddy_service.get_by_ids(session.selected_buddies)
+        activity_name = self._activity_service.get_name(session.selected_suggestion)
 
         # Send DM to each buddy via tool
         for buddy in selected_buddy_objs:

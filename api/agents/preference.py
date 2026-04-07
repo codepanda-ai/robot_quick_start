@@ -7,12 +7,10 @@ from interfaces.agent import AgentResult
 from interfaces.llm_client import ILLMClient, LLMResponse
 from interfaces.models import SessionState, Phase
 from core.tool_registry import ToolRegistry
+from constants import PREFERENCE_FIELD_ORDER
 
 
 logger = logging.getLogger(__name__)
-
-# All 5 required preference fields — must all be collected before triggering suggestions
-ALL_PREFERENCE_FIELDS = ["activity", "budget", "vibe", "location", "availability"]
 
 
 class PreferenceAgent(BaseAgent):
@@ -76,7 +74,7 @@ class PreferenceAgent(BaseAgent):
             # _handle_gathering gates the suggestion chain on _profile_is_complete.
             updates["phase"] = Phase.GATHERING
 
-            missing = [f for f in ALL_PREFERENCE_FIELDS if not merged.get(f)]
+            missing = [f for f in PREFERENCE_FIELD_ORDER if not merged.get(f)]
             if missing:
                 logger.info("Collecting preferences — still missing: %s", missing)
             else:

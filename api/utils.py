@@ -4,8 +4,6 @@ import logging
 import re
 from typing import Optional
 
-from data.mock_data import MOCK_ACTIVITIES, MOCK_BUDDIES
-
 
 logger = logging.getLogger(__name__)
 
@@ -50,24 +48,6 @@ def profile_is_complete(profile) -> bool:
 def is_greeting(text: str, greeting_keywords) -> bool:
     """Whole-word match so 'hiking' doesn't trigger on the 'hi' inside it."""
     return any(re.search(r"\b" + re.escape(kw) + r"\b", text) for kw in greeting_keywords)
-
-
-# ─── Mock data lookups ───────────────────────────────────────────────
-
-def resolve_activity(suggestion_id: Optional[str]):
-    """Return the Activity object for the given id, or None."""
-    return next((a for a in MOCK_ACTIVITIES if a.id == suggestion_id), None)
-
-
-def resolve_activity_name(suggestion_id: Optional[str]) -> str:
-    """Return the activity's display name, falling back to a generic label."""
-    activity = resolve_activity(suggestion_id)
-    return activity.name if activity else "the activity"
-
-
-def resolve_buddies(selected_ids: list) -> list:
-    """Return Buddy objects for each id in selected_ids."""
-    return [b for b in MOCK_BUDDIES if b.id in selected_ids]
 
 
 # ─── Invite preview ──────────────────────────────────────────────────

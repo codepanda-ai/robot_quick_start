@@ -1,7 +1,7 @@
 import logging
 
 from interfaces.tool import ITool
-from data.mock_data import MOCK_BUDDIES
+from services.buddy_service import BuddyService
 
 
 logger = logging.getLogger(__name__)
@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 
 class SearchBuddiesTool(ITool):
     """Searches for buddies whose interests match an activity type."""
+
+    def __init__(self, buddy_service: BuddyService):
+        self._buddy_service = buddy_service
 
     def name(self) -> str:
         return "search_buddies"
@@ -30,11 +33,9 @@ class SearchBuddiesTool(ITool):
 
     def execute(self, **kwargs) -> dict:
         activity_type = kwargs.get("activity_type", "")
-        if not activity_type:
-            buddies = MOCK_BUDDIES
-        else:
-            buddies = [b for b in MOCK_BUDDIES if activity_type.lower() in b.interests]
-            if not buddies:
-                buddies = MOCK_BUDDIES
-                logger.info("No exact buddy match for '%s', returning all buddies", activity_type)
+        buddies = (
+            self._buddy_service.get_by_activity_type(activity_type)
+            if activity_type
+            else self._buddy_service.get_all()
+        )
         return {"buddies": [b.model_dump() for b in buddies]}
