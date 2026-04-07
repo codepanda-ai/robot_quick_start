@@ -71,10 +71,10 @@ class MockLLMClient(ILLMClient):
             return self._handle_preference(text, messages)
         elif "suggestion agent" in system_context:
             return self._handle_suggestion(text, messages, tools)
+        elif "buddy agent" in system_context:
+            return self._handle_buddy(text, messages, tools)
         elif "invite agent" in system_context:
-            return self._handle_invite(text, messages, tools)
-        elif "confirmation agent" in system_context:
-            return self._handle_confirmation(text, system_context)
+            return self._handle_invite(text, system_context)
 
         # Default: try to classify
         return self._handle_fallback(text)
@@ -246,8 +246,8 @@ class MockLLMClient(ILLMClient):
             finish_reason=FinishReason.TOOL_USE,
         )
 
-    def _handle_confirmation(self, text: str, system_context: str) -> LLMResponse:
-        """Generate an invite message preview for the ConfirmationAgent."""
+    def _handle_invite(self, text: str, system_context: str) -> LLMResponse:
+        """Generate an invite message preview for the InviteAgent."""
         # Extract activity name and buddy names from system context heuristically
         # In production this would be a real LLM call with the full context
         activity_name = "this activity"
@@ -262,7 +262,7 @@ class MockLLMClient(ILLMClient):
         )
         return LLMResponse(content=preview, finish_reason=FinishReason.STOP)
 
-    def _handle_invite(self, text: str, messages: list[dict], tools: Optional[list[dict]]) -> LLMResponse:
+    def _handle_buddy(self, text: str, messages: list[dict], tools: Optional[list[dict]]) -> LLMResponse:
         tool_calls = []
 
         # Search for buddies

@@ -47,8 +47,8 @@ class OrchestratorAgent:
         fallback_agent: IAgent,
         preference_agent: IAgent,
         suggestion_agent: IAgent,
+        buddy_agent: IAgent,
         invite_agent: IAgent,
-        confirmation_agent: IAgent,
         session_service: SessionService,
         message_api_client,
         intent_profile_service=None,
@@ -56,8 +56,8 @@ class OrchestratorAgent:
         self._fallback = fallback_agent
         self._preference = preference_agent
         self._suggestion = suggestion_agent
+        self._buddy = buddy_agent
         self._invite = invite_agent
-        self._confirmation = confirmation_agent
         self._session_service = session_service
         self._msg_client = message_api_client
         self._intent_profile_service = intent_profile_service
@@ -249,7 +249,7 @@ class OrchestratorAgent:
         return {"toast": {"type": "info", "content": "Starting fresh! 🔄"}}
 
     def _on_select_suggestion(self, user_id: str, session: SessionState, card_action: dict) -> dict:
-        self._route_to_agent(user_id, self._invite, "", session, context=card_action)
+        self._route_to_agent(user_id, self._buddy, "", session, context=card_action)
         updated = self._session_service.get_session(user_id)
 
         # Send NEW buddy card as a new message
@@ -260,7 +260,7 @@ class OrchestratorAgent:
         return {"toast": {"type": "info", "content": f"✅ '{activity_name}' selected! Now pick your buddies."}}
 
     def _on_select_buddy(self, user_id: str, session: SessionState, card_action: dict) -> dict:
-        self._route_to_agent(user_id, self._invite, "", session, context=card_action)
+        self._route_to_agent(user_id, self._buddy, "", session, context=card_action)
         updated = self._session_service.get_session(user_id)
 
         # Resolve activity name
@@ -280,11 +280,11 @@ class OrchestratorAgent:
             card_action["action"] = "buddies_confirmed"
             # Clear selected buddies
             self._session_service.apply_agent_result(
-                user_id, self._invite,
+                user_id, self._buddy,
                 AgentResult(session_updates={"selected_buddies": []})
             )
 
-        self._route_to_agent(user_id, self._invite, "", session, context=card_action)
+        self._route_to_agent(user_id, self._buddy, "", session, context=card_action)
         updated = self._session_service.get_session(user_id)
 
         activity_name = self._resolve_activity_name(updated.selected_suggestion)
@@ -299,7 +299,7 @@ class OrchestratorAgent:
         return {"toast": {"type": "info", "content": "Buddies locked in! 🎉"}}
 
     def _on_accept_invite(self, user_id: str, session: SessionState) -> dict:
-        self._route_to_agent(user_id, self._confirmation, "", session, context={"action": "accept_invite"})
+        self._route_to_agent(user_id, self._invite, "", session, context={"action": "accept_invite"})
         updated = self._session_service.get_session(user_id)
 
         activity = self._resolve_activity(updated.selected_suggestion)
@@ -315,7 +315,7 @@ class OrchestratorAgent:
         return self._on_reset(user_id, session)
 
     def _on_cancel(self, user_id: str, session: SessionState) -> dict:
-        self._route_to_agent(user_id, self._invite, "", session, context={"action": "cancel"})
+        self._route_to_agent(user_id, self._buddy, "", session, context={"action": "cancel"})
         updated = self._session_service.get_session(user_id)
         weather = MOCK_WEATHER[0] if MOCK_WEATHER else None
         if updated.suggestions:
@@ -358,13 +358,13 @@ class OrchestratorAgent:
     def _generate_invite_preview(self, user_id: str, activity_name: str, buddies, session: SessionState) -> str:
         """Ask the LLM to generate an invite message preview."""
         from llm.mock_client import MockLLMClient
-        # Build a prompt for the confirmation agent's LLM context
+        # Build a prompt for the invite agent's LLM context
         buddy_names = ", ".join(b.name for b in buddies) if buddies else "everyone"
         messages = [
             {
                 "role": "system",
                 "content": (
-                    f"You are the confirmation agent for a Weekend Buddy bot. "
+                    f"You are the invite agent for a Weekend Buddy bot. "
                     f"Selected activity: {activity_name}. "
                     f"Selected buddies: {buddy_names}."
                 ),
@@ -372,7 +372,7 @@ class OrchestratorAgent:
             {"role": "user", "content": "generate_invite_preview"},
         ]
         try:
-            response = self._confirmation.llm.chat(messages)
+            response = self._invite.llm.chat(messages)
             return response.content
         except Exception as e:
             logger.warning("Failed to generate invite preview: %s", e)
