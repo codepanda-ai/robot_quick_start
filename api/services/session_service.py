@@ -13,6 +13,109 @@ class SessionService:
 
     Optionally accepts an IntentProfileService to auto-persist intent_profile updates
     to long-term memory after every agent result that touches the intent_profile.
+
+    JSON Schema (matches ``interfaces.models``; enums are string values as serialized by Pydantic)::
+
+        {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$defs": {
+            "IntentProfile": {
+              "type": "object",
+              "properties": {
+                "activity": { "type": ["string", "null"] },
+                "budget": {
+                  "anyOf": [
+                    { "type": "null" },
+                    { "enum": ["low", "medium", "high"] }
+                  ]
+                },
+                "vibe": {
+                  "anyOf": [
+                    { "type": "null" },
+                    { "enum": ["chill", "adventurous", "social"] }
+                  ]
+                },
+                "availability": { "type": ["string", "null"] },
+                "location": { "type": ["string", "null"] }
+              },
+              "additionalProperties": false
+            },
+            "Activity": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "type": { "type": "string" },
+                "budget": { "enum": ["low", "medium", "high"] },
+                "vibe": { "enum": ["chill", "adventurous", "social"] },
+                "reason": { "type": "string" }
+              },
+              "required": ["id", "name", "type", "budget", "vibe", "reason"],
+              "additionalProperties": false
+            },
+            "Buddy": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "open_id": { "type": "string" },
+                "interests": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              },
+              "required": ["id", "name", "open_id", "interests"],
+              "additionalProperties": false
+            },
+            "SessionState": {
+              "type": "object",
+              "properties": {
+                "phase": {
+                  "enum": [
+                    "idle",
+                    "gathering",
+                    "suggesting",
+                    "inviting",
+                    "confirmed"
+                  ]
+                },
+                "intent_profile": { "$ref": "#/$defs/IntentProfile" },
+                "suggestions": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/Activity" }
+                },
+                "selected_suggestion": { "type": ["string", "null"] },
+                "buddy_candidates": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/Buddy" }
+                },
+                "selected_buddies": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "confirmation_status": {
+                  "anyOf": [
+                    { "type": "null" },
+                    { "enum": ["pending", "confirmed", "cancelled"] }
+                  ]
+                }
+              },
+              "required": [
+                "phase",
+                "intent_profile",
+                "suggestions",
+                "selected_suggestion",
+                "buddy_candidates",
+                "selected_buddies",
+                "confirmation_status"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+
+    Root document for a stored session is ``SessionState``; ``intent_profile`` is the nested
+    ``$ref`` to ``IntentProfile`` above.
     """
 
     def __init__(self, session_store: ISessionStore, intent_profile_service=None):
