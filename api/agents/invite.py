@@ -18,13 +18,13 @@ class InviteAgent(BaseAgent):
     """Handles the invite preview and final send step.
 
     Handles two card actions:
-    - accept_invite: sends DM to each selected buddy, sets phase=CONFIRMED
-    - reject_invite:  full reset to IDLE
+    - send_invites: sends DM to each selected buddy, sets phase=CONFIRMED
+    - reset:  full reset to IDLE
     """
 
     WRITABLE_FIELDS: set = {
         "phase", "confirmation_status",
-        # Reset fields — needed for reject_invite
+        # Reset fields — needed for reset
         "intent_profile", "suggestions", "selected_suggestion",
         "buddy_candidates", "selected_buddies",
     }
@@ -47,8 +47,8 @@ class InviteAgent(BaseAgent):
                     "You are the invite agent for a Weekend Buddy bot. "
                     "Your task is to draft a warm, concise invite message for the confirmed activity and send it to each selected buddy. "
                     "The message should mention the activity name, feel personal and upbeat, and include a call to action. "
-                    "On accept_invite: generate the invite message, send it to each buddy via direct message, then confirm the plan. "
-                    "On reject_invite: discard the current plan entirely and reset the session so the user can start fresh. "
+                    "On send_invites: generate the invite message, send it to each buddy via direct message, then confirm the plan. "
+                    "On reset: discard the current plan entirely and reset the session so the user can start fresh. "
                     f"Current action: {action}. "
                     f"Selected activity: {session.selected_suggestion}. "
                     f"Selected buddies: {session.selected_buddies}."
@@ -69,9 +69,9 @@ class InviteAgent(BaseAgent):
 
         action = context.get("action", "")
 
-        if action == "accept_invite":
+        if action == "send_invites":
             return self._handle_accept(session, response)
-        elif action == "reject_invite":
+        elif action == "reset":
             return self._handle_reject()
 
         return AgentResult(session_updates={}, response=response.content)
@@ -96,7 +96,7 @@ class InviteAgent(BaseAgent):
             response="Invites sent! Have an amazing weekend! 🎉",
         )
 
-    def _handle_reject(self) -> AgentResult:
+    def _handle_reset(self) -> AgentResult:
         """Reset the entire session to IDLE."""
         return AgentResult(
             session_updates={
@@ -113,7 +113,7 @@ class InviteAgent(BaseAgent):
 
     def _build_invite_message(self, buddy_name: str, activity_name: str, llm_content: str) -> str:
         """Use LLM-generated content if available, otherwise fall back to template."""
-        if llm_content and llm_content not in ("accept_invite", ""):
+        if llm_content and llm_content not in ("send_invites", ""):
             return llm_content
         return (
             f"Hey {buddy_name}! 🎉 You're invited to join **{activity_name}** this weekend. "

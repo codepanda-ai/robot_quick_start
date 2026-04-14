@@ -4,9 +4,11 @@ Feishu/Lark bot that guides users through weekend activity planning.
 Python + Flask + Pydantic v2, deployed on Vercel.
 
 ## Commands
+- Setup: `python3 -m venv myenv` + `source myenv/bin/activate`
 - Install: `pip install -r requirements.txt`
-- Run locally: `flask run` or `python api/index.py`
-- Deploy: auto-deploys to Vercel on push
+- Run locally: `python api/index.py`
+- Expose local server: `ngrok http 3000`
+- Deploy: auto-deploys to Vercel on git push
 - E2E test: use `/test` skill (browser automation against live Lark)
 
 ## Architecture

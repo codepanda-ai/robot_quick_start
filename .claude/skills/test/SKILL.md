@@ -22,7 +22,8 @@ Automates the full user flow through the Lark web client using the `mcp__Claude_
 ## Test URL
 
 ```
-https://test-dhkystf4ktrf.sg.larksuite.com/next/messenger/
+Sandbox: https://test-dhkystf4ktrf.sg.larksuite.com/next/messenger/
+Production: https://csgfye2fddl6.sg.larksuite.com/next/messenger/
 ```
 
 ## Step-by-Step Procedure

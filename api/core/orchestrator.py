@@ -34,8 +34,8 @@ class OrchestratorAgent:
         select_buddy      → BuddyAgent (adds buddy to selection)
         buddies_confirmed → BuddyAgent → InviteAgent preview card
         go_solo           → clears buddies → same as buddies_confirmed
-        accept_invite     → InviteAgent (sends DMs, confirms plan)
-        reject_invite / reset → full session reset
+        send_invites     → InviteAgent (sends DMs, confirms plan)
+        reset → full session reset
         cancel            → BuddyAgent (returns to suggestions)
     """
 
@@ -89,8 +89,7 @@ class OrchestratorAgent:
             "select_buddy":      self._on_select_buddy,
             "buddies_confirmed": self._on_buddies_confirmed,
             "go_solo":           self._on_go_solo,
-            "accept_invite":     self._on_accept_invite,
-            "reject_invite":     self._on_reset,
+            "send_invites":      self._on_send_invites,
             "reset":             self._on_reset,
             "cancel":            self._on_cancel,
             "quick_preference":  self._on_quick_preference,
@@ -241,8 +240,8 @@ class OrchestratorAgent:
         )
         return self._on_buddies_confirmed(user_id, session, {**card_action, "action": "buddies_confirmed"})
 
-    def _on_accept_invite(self, user_id: str, session: SessionState, _card_action: dict) -> dict:
-        self._route(user_id, self._invite, "", session, context={"action": "accept_invite"})
+    def _on_send_invites(self, user_id: str, session: SessionState, _card_action: dict) -> dict:
+        self._route(user_id, self._invite, "", session, context={"action": "send_invites"})
         updated = self._session_service.get_session(user_id)
         activity = self._activity_service.get_by_id(updated.selected_suggestion)
         buddies = self._buddy_service.get_by_ids(updated.selected_buddies)

@@ -118,13 +118,8 @@ def handle_go_solo(open_id: str, action_value: dict) -> dict:
     return _card_handler(open_id, action_value)
 
 
-@callback_manager.register("accept_invite")
-def handle_accept_invite(open_id: str, action_value: dict) -> dict:
-    return _card_handler(open_id, action_value)
-
-
-@callback_manager.register("reject_invite")
-def handle_reject_invite(open_id: str, action_value: dict) -> dict:
+@callback_manager.register("send_invites")
+def handle_send_invites(open_id: str, action_value: dict) -> dict:
     return _card_handler(open_id, action_value)
 
 
