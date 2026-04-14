@@ -53,11 +53,11 @@ class OrchestratorAgent:
         weather_service: WeatherService,
         intent_profile_service=None,
     ):
-        self._fallback = fallback_agent
-        self._preference = preference_agent
-        self._suggestion = suggestion_agent
-        self._buddy = buddy_agent
-        self._invite = invite_agent
+        self._fallback_agent = fallback_agent
+        self._preference_agent = preference_agent
+        self._suggestion_agent = suggestion_agent
+        self._buddy_agent = buddy_agent
+        self._invite_agent = invite_agent
         self._session_service = session_service
         self._msg_client = message_api_client
         self._activity_service = activity_service
@@ -140,7 +140,7 @@ class OrchestratorAgent:
         if handler:
             handler(user_id, message, session)
         else:
-            self._route(user_id, self._fallback, message, session)
+            self._route(user_id, self._fallback_agent, message, session)
 
         return {}
 
@@ -148,17 +148,17 @@ class OrchestratorAgent:
         text = message.lower().strip()
 
         if is_greeting(text, GREETING_KEYWORDS):
-            self._route(user_id, self._fallback, message, session)
+            self._route(user_id, self._fallback_agent, message, session)
         elif any(kw in text for kw in ACTIVITY_KEYWORDS) or len(text) >= 10:
-            self._route(user_id, self._preference, message, session)
+            self._route(user_id, self._preference_agent, message, session)
             updated = self._session_service.get_session(user_id)
             if profile_is_complete(updated.intent_profile):
                 self._chain_to_suggestions(user_id, message, updated)
         else:
-            self._route(user_id, self._fallback, message, session)
+            self._route(user_id, self._fallback_agent, message, session)
 
     def _on_phase_gathering(self, user_id: str, message: str, session: SessionState) -> None:
-        self._route(user_id, self._preference, message, session)
+        self._route(user_id, self._preference_agent, message, session)
         updated = self._session_service.get_session(user_id)
         if profile_is_complete(updated.intent_profile):
             self._chain_to_suggestions(user_id, message, updated)
@@ -173,8 +173,9 @@ class OrchestratorAgent:
         logger.info("Restoring saved intent profile for %s: %s", user_id, saved.model_dump())
 
         self._session_service.apply_agent_result(
-            user_id, self._preference,
-            AgentResult(session_updates={"intent_profile": saved.model_dump(), "phase": Phase.GATHERING})
+            user_id,
+            self._preference_agent,
+            AgentResult(session_updates={"intent_profile": saved.model_dump(), "phase": Phase.GATHERING}),
         )
         updated = self._session_service.get_session(user_id)
 
@@ -186,13 +187,13 @@ class OrchestratorAgent:
             missing = [f for f in ["activity", "budget", "vibe", "location", "availability"]
                        if not getattr(updated.intent_profile, f)]
             send_text(self._msg_client, user_id, f"Found your last preferences! Just need a couple more details — {', '.join(missing)}.")
-            self._route(user_id, self._preference, "", updated)
+            self._route(user_id, self._preference_agent, "", updated)
 
         return {}
 
     def _chain_to_suggestions(self, user_id: str, message: str, session: SessionState) -> None:
         """Run SuggestionAgent then send the suggestions card."""
-        self._route(user_id, self._suggestion, message, session)
+        self._route(user_id, self._suggestion_agent, message, session)
         updated = self._session_service.get_session(user_id)
         weather = self._weather_service.get_forecast()
         if updated.suggestions:
@@ -209,39 +210,40 @@ class OrchestratorAgent:
         return {}
 
     def _on_select_suggestion(self, user_id: str, session: SessionState, card_action: dict) -> dict:
-        self._route(user_id, self._buddy, "", session, context=card_action)
+        self._route(user_id, self._buddy_agent, "", session, context=card_action)
         updated = self._session_service.get_session(user_id)
         activity_name = card_action.get("activity", "the activity")
         send_card(self._msg_client, user_id, build_buddy_card(updated.buddy_candidates, activity_name))
         return build_toast("info", f"✅ '{activity_name}' selected! Now pick your buddies.")
 
     def _on_select_buddy(self, user_id: str, session: SessionState, card_action: dict) -> dict:
-        self._route(user_id, self._buddy, "", session, context=card_action)
+        self._route(user_id, self._buddy_agent, "", session, context=card_action)
         buddy_id = card_action.get("buddy_id", "")
         buddy = self._buddy_service.get_by_ids([buddy_id])
         buddy_name = buddy[0].name if buddy else buddy_id
         return build_toast("info", f"✅ {buddy_name} added to the invite list!")
 
     def _on_buddies_confirmed(self, user_id: str, session: SessionState, card_action: dict) -> dict:
-        self._route(user_id, self._buddy, "", session, context=card_action)
+        self._route(user_id, self._buddy_agent, "", session, context=card_action)
         updated = self._session_service.get_session(user_id)
         activity = self._activity_service.get_by_id(updated.selected_suggestion)
         activity_name = activity.name if activity else "the activity"
         buddies = self._buddy_service.get_by_ids(updated.selected_buddies)
-        preview = generate_invite_preview(self._invite, activity_name, buddies)
+        preview = generate_invite_preview(self._invite_agent, activity_name, buddies)
         if activity:
             send_card(self._msg_client, user_id, build_invite_preview_card(activity, buddies, preview))
         return build_toast("info", "Buddies locked in! 🎉")
 
     def _on_go_solo(self, user_id: str, session: SessionState, card_action: dict) -> dict:
         self._session_service.apply_agent_result(
-            user_id, self._buddy,
-            AgentResult(session_updates={"selected_buddies": []})
+            user_id,
+            self._buddy_agent,
+            AgentResult(session_updates={"selected_buddies": []}),
         )
         return self._on_buddies_confirmed(user_id, session, {**card_action, "action": "buddies_confirmed"})
 
     def _on_send_invites(self, user_id: str, session: SessionState, _card_action: dict) -> dict:
-        self._route(user_id, self._invite, "", session, context={"action": "send_invites"})
+        self._route(user_id, self._invite_agent, "", session, context={"action": "send_invites"})
         updated = self._session_service.get_session(user_id)
         activity = self._activity_service.get_by_id(updated.selected_suggestion)
         buddies = self._buddy_service.get_by_ids(updated.selected_buddies)
@@ -250,7 +252,7 @@ class OrchestratorAgent:
         return build_toast("success", "🎉 Invites sent! Enjoy your weekend!")
 
     def _on_cancel(self, user_id: str, session: SessionState, _card_action: dict) -> dict:
-        self._route(user_id, self._buddy, "", session, context={"action": "cancel"})
+        self._route(user_id, self._buddy_agent, "", session, context={"action": "cancel"})
         updated = self._session_service.get_session(user_id)
         weather = self._weather_service.get_forecast()
         if updated.suggestions:
@@ -262,7 +264,7 @@ class OrchestratorAgent:
         return build_toast("info", "Starting fresh! 🔄")
 
     def _on_quick_preference(self, user_id: str, session: SessionState, card_action: dict) -> dict:
-        self._route(user_id, self._preference, card_action.get("activity", ""), session)
+        self._route(user_id, self._preference_agent, card_action.get("activity", ""), session)
         return build_toast("info", "Got it!")
 
     # ─── Internal transitions ─────────────────────────────────────────
@@ -271,7 +273,7 @@ class OrchestratorAgent:
         send_text(self._msg_client, user_id, "Let's start fresh!")
         self._session_service.reset_session(user_id)
         fresh = self._session_service.get_session(user_id)
-        self._route(user_id, self._preference, "start over", fresh)
+        self._route(user_id, self._preference_agent, "start over", fresh)
 
     def _route(
         self,
@@ -285,4 +287,4 @@ class OrchestratorAgent:
         result = agent.handle(user_id, message, session, context)
         logger.info("Agent '%s' result: %s", agent.agent_name(), result)
         self._session_service.apply_agent_result(user_id, agent, result)
-        return result
+        
