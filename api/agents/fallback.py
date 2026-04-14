@@ -41,7 +41,6 @@ class FallbackAgent(BaseAgent):
         self,
         session: SessionState,
         response: LLMResponse,
-        tool_results: list[dict],
         context: Optional[dict],
     ) -> AgentResult:
         return AgentResult(session_updates={}, response=response.content)

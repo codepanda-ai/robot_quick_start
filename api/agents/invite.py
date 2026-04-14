@@ -61,7 +61,6 @@ class InviteAgent(BaseAgent):
         self,
         session: SessionState,
         response: LLMResponse,
-        tool_results: list[dict],
         context: Optional[dict],
     ) -> AgentResult:
         if not context:

@@ -45,7 +45,6 @@ class SuggestionAgent(BaseAgent):
         self,
         session: SessionState,
         response: LLMResponse,
-        tool_results: list[dict],
         context: Optional[dict],
     ) -> AgentResult:
         # Filter activities based on user preferences

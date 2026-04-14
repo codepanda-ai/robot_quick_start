@@ -61,14 +61,14 @@ class MockLLMClient(ILLMClient):
                     "text": "Hey! I'm your Weekend Buddy 🎉 Ready to plan something fun? "
                             "Tell me what you feel like doing — hiking, dining, movies, or anything else!"
                 })],
-                finish_reason=FinishReason.TOOL_USE,
+                finish_reason=FinishReason.STOP,
             )
         return LLMResponse(
             content="I'm best at helping plan weekend activities! What sounds fun — hiking, dining, board games?",
             tool_calls=[ToolCall(name="send_lark_text", arguments={
                 "text": "I'm best at helping plan weekend activities! What sounds fun — hiking, dining, board games?"
             })],
-            finish_reason=FinishReason.TOOL_USE,
+            finish_reason=FinishReason.STOP,
         )
 
     def _handle_preference(self, text: str, messages: list[dict]) -> LLMResponse:
@@ -148,7 +148,7 @@ class MockLLMClient(ILLMClient):
                 return LLMResponse(
                     content=content,
                     tool_calls=[ToolCall(name="send_lark_text", arguments={"text": question})],
-                    finish_reason=FinishReason.TOOL_USE,
+                    finish_reason=FinishReason.STOP,
                 )
             else:
                 # All fields collected — no more questions
@@ -163,7 +163,7 @@ class MockLLMClient(ILLMClient):
         return LLMResponse(
             content="ask_followup",
             tool_calls=[ToolCall(name="send_lark_text", arguments={"text": question})],
-            finish_reason=FinishReason.TOOL_USE,
+            finish_reason=FinishReason.STOP,
         )
 
     def _parse_profile_from_context(self, system_context: str) -> dict:
@@ -204,7 +204,7 @@ class MockLLMClient(ILLMClient):
         return LLMResponse(
             content="Here are some suggestions based on your preferences!",
             tool_calls=tool_calls,
-            finish_reason=FinishReason.TOOL_USE,
+            finish_reason=FinishReason.STOP,
         )
 
     def _handle_invite(self, text: str, system_context: str) -> LLMResponse:
@@ -235,5 +235,5 @@ class MockLLMClient(ILLMClient):
         return LLMResponse(
             content="Let me find some buddies who'd enjoy this activity!",
             tool_calls=tool_calls,
-            finish_reason=FinishReason.TOOL_USE,
+            finish_reason=FinishReason.STOP,
         )

@@ -1,3 +1,4 @@
+import uuid
 from abc import ABC, abstractmethod
 from typing import Optional
 from enum import Enum
@@ -6,6 +7,7 @@ from pydantic import BaseModel, Field
 
 
 class ToolCall(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     arguments: dict = Field(default_factory=dict)
 

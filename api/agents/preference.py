@@ -48,7 +48,6 @@ class PreferenceAgent(BaseAgent):
         self,
         session: SessionState,
         response: LLMResponse,
-        tool_results: list[dict],
         context: Optional[dict],
     ) -> AgentResult:
         # Try to parse extracted preferences from LLM response
