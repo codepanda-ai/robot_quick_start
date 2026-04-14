@@ -9,6 +9,7 @@ Python + Flask + Pydantic v2, deployed on Vercel.
 - Run locally: `python api/index.py`
 - Expose local server: `ngrok http 3000`
 - Deploy: auto-deploys to Vercel on git push
+- Unit test: `pytest api/tests/test_suggestion_agent.py`
 - E2E test: use `/test` skill (browser automation against live Lark)
 
 ## Architecture

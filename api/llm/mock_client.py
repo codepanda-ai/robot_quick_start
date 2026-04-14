@@ -169,9 +169,13 @@ class MockLLMClient(ILLMClient):
     def _parse_profile_from_context(self, system_context: str) -> dict:
         """Extract the current intent profile JSON from the system prompt."""
         try:
-            # System prompt contains: "Current profile: {...}"
-            marker = "current profile:"
-            idx = system_context.find(marker)
+            idx = -1
+            marker = None
+            for candidate in ["current profile:", "user preferences:"]:
+                idx = system_context.find(candidate)
+                if idx != -1:
+                    marker = candidate
+                    break
             if idx == -1:
                 return {}
             json_str = system_context[idx + len(marker):].strip()
@@ -191,19 +195,111 @@ class MockLLMClient(ILLMClient):
         except Exception:
             return {}
 
+    # --- Suggestion helpers (multi-turn: weather check → rank) ---
+
+    OUTDOOR_TYPES = {"hiking", "beach", "outdoor", "camping", "running"}
+
+    # Activity rankings by preference type (id → base score)
+    ACTIVITY_SCORES = {
+        "hiking":    {"sg_1": 3, "sg_6": 3, "sg_4": 1, "sg_5": 0, "sg_3": 0, "sg_2": 0},
+        "beach":     {"sg_4": 3, "sg_1": 1, "sg_6": 1, "sg_5": 0, "sg_3": 0, "sg_2": 0},
+        "nightlife": {"sg_2": 3, "sg_5": 1, "sg_3": 1, "sg_1": 0, "sg_4": 0, "sg_6": 0},
+        "dining":    {"sg_3": 3, "sg_2": 1, "sg_5": 1, "sg_1": 0, "sg_4": 0, "sg_6": 0},
+        "indoor":    {"sg_5": 3, "sg_3": 1, "sg_2": 1, "sg_1": 0, "sg_4": 0, "sg_6": 0},
+    }
+
+    ACTIVITY_NAMES = {
+        "sg_1": "MacLehose Trail Stage 2",
+        "sg_2": "Lan Kwai Fong Pub Crawl",
+        "sg_3": "Dim Sum at Tim Ho Wan",
+        "sg_4": "Shek O Beach Day",
+        "sg_5": "Board Game Cafe",
+        "sg_6": "Peak Circle Walk",
+    }
+
+    OUTDOOR_ACTIVITY_IDS = {"sg_1", "sg_4", "sg_6"}
+
     def _handle_suggestion(self, text: str, messages: list[dict], tools: Optional[list[dict]]) -> LLMResponse:
-        tool_calls = []
+        # Turn 2: weather results are in — rank with weather context
+        weather = self._extract_tool_result(messages, "get_weather")
+        if weather is not None:
+            return self._rank_with_weather(messages, weather)
 
-        # Always call weather tool first
-        if tools and any(t["function"]["name"] == "get_weather" for t in tools):
-            tool_calls.append(ToolCall(name="get_weather", arguments={"day": "Saturday"}))
+        # Turn 1: decide if weather check is needed
+        system_context = self._get_system_context(messages)
+        profile = self._parse_profile_from_context(system_context)
+        activity_type = profile.get("activity", "").lower()
 
-        # Then send the card
-        tool_calls.append(ToolCall(name="send_lark_card", arguments={"card_type": "suggestions"}))
+        if activity_type in self.OUTDOOR_TYPES:
+            if tools and any(t["function"]["name"] == "get_weather" for t in tools):
+                return LLMResponse(
+                    content="",
+                    tool_calls=[ToolCall(name="get_weather", arguments={"day": "Saturday"})],
+                    finish_reason=FinishReason.TOOL_USE,
+                )
 
+        # Indoor preference or no weather tool — rank without weather
+        return self._rank_activities(activity_type, bad_weather=False)
+
+    def _extract_tool_result(self, messages: list[dict], tool_name: str) -> Optional[dict]:
+        """Find the result of a specific tool call in the message history."""
+        # Walk backwards to find the most recent tool result matching tool_name
+        tool_call_ids = set()
+        for msg in messages:
+            if msg.get("role") == "assistant":
+                for tc in msg.get("tool_calls", []):
+                    func = tc.get("function", {})
+                    if func.get("name") == tool_name:
+                        tool_call_ids.add(tc.get("id"))
+
+        for msg in messages:
+            if msg.get("role") == "tool" and msg.get("tool_call_id") in tool_call_ids:
+                try:
+                    return json.loads(msg["content"])
+                except (json.JSONDecodeError, KeyError):
+                    return {}
+        return None
+
+    def _rank_with_weather(self, messages: list[dict], weather: dict) -> LLMResponse:
+        """Rank activities considering weather data."""
+        system_context = self._get_system_context(messages)
+        profile = self._parse_profile_from_context(system_context)
+        activity_type = profile.get("activity", "").lower()
+
+        # Tool result is wrapped as {"tool": "get_weather", "result": {...}}
+        forecast = weather.get("result", weather) if isinstance(weather.get("result"), dict) else weather
+        condition = forecast.get("condition", "").lower()
+        bad_weather = any(w in condition for w in ("rain", "storm", "thunderstorm"))
+
+        return self._rank_activities(activity_type, bad_weather=bad_weather, weather_desc=weather)
+
+    def _rank_activities(self, activity_type: str, bad_weather: bool = False, weather_desc: dict | None = None) -> LLMResponse:
+        """Produce a ranked JSON response with top 3 activities."""
+        scores = dict(self.ACTIVITY_SCORES.get(activity_type, {}))
+        if not scores:
+            scores = {aid: 1 for aid in self.ACTIVITY_NAMES}
+
+        if bad_weather:
+            for aid in self.OUTDOOR_ACTIVITY_IDS:
+                scores[aid] = scores.get(aid, 0) - 5
+
+        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
+
+        suggestions = []
+        for aid, _ in ranked:
+            name = self.ACTIVITY_NAMES[aid]
+            if bad_weather and aid in self.OUTDOOR_ACTIVITY_IDS:
+                reason = f"⚠️ Weather may not be ideal for {name}, but still a great option if it clears up."
+            elif aid in self.OUTDOOR_ACTIVITY_IDS and weather_desc:
+                reason = f"☀️ Weather looks good for {name} — perfect for getting outdoors!"
+            else:
+                reason = f"🎯 {name} is a great match for your preferences."
+            suggestions.append({"id": aid, "reason": reason})
+
+        content = json.dumps({"suggestions": suggestions})
         return LLMResponse(
-            content="Here are some suggestions based on your preferences!",
-            tool_calls=tool_calls,
+            content=content,
+            tool_calls=[ToolCall(name="send_lark_card", arguments={"card_type": "suggestions"})],
             finish_reason=FinishReason.STOP,
         )
 
